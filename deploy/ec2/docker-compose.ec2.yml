@@ -1,0 +1,80 @@
+version: '3.9'
+
+# EC2 production compose — uses RDS instead of local MySQL
+# Set these env vars before running:
+#   RDS_HOST, RDS_USER, RDS_PASSWORD, JWT_SECRET, ECR_BASE
+
+services:
+
+  user-service:
+    image: ${ECR_BASE}/user-service:latest
+    container_name: user-service
+    environment:
+      PORT: 3001
+      DB_HOST: ${RDS_HOST}
+      DB_PORT: 3306
+      DB_NAME: users_db
+      DB_USER: ${RDS_USER}
+      DB_PASSWORD: ${RDS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: production
+    restart: unless-stopped
+    networks: [microservices]
+
+  order-service:
+    image: ${ECR_BASE}/order-service:latest
+    container_name: order-service
+    environment:
+      PORT: 3002
+      DB_HOST: ${RDS_HOST}
+      DB_PORT: 3306
+      DB_NAME: orders_db
+      DB_USER: ${RDS_USER}
+      DB_PASSWORD: ${RDS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      USER_SERVICE_URL: http://user-service:3001
+      NODE_ENV: production
+    restart: unless-stopped
+    networks: [microservices]
+
+  product-service:
+    image: ${ECR_BASE}/product-service:latest
+    container_name: product-service
+    environment:
+      DB_HOST: ${RDS_HOST}
+      DB_PORT: 3306
+      DB_NAME: products_db
+      DB_USER: ${RDS_USER}
+      DB_PASSWORD: ${RDS_PASSWORD}
+    restart: unless-stopped
+    networks: [microservices]
+
+  payment-service:
+    image: ${ECR_BASE}/payment-service:latest
+    container_name: payment-service
+    environment:
+      DB_HOST: ${RDS_HOST}
+      DB_PORT: 3306
+      DB_NAME: payments_db
+      DB_USER: ${RDS_USER}
+      DB_PASSWORD: ${RDS_PASSWORD}
+      ORDER_SERVICE_URL: http://order-service:3002
+    restart: unless-stopped
+    networks: [microservices]
+
+  gateway:
+    image: ${ECR_BASE}/gateway:latest
+    container_name: gateway
+    ports:
+      - "80:80"
+    depends_on:
+      - user-service
+      - order-service
+      - product-service
+      - payment-service
+    restart: unless-stopped
+    networks: [microservices]
+
+networks:
+  microservices:
+    driver: bridge

@@ -1,0 +1,132 @@
+# ── Global settings ───────────────────────────────────────────────────────────
+namespace: microservices
+
+global:
+  registry: ""          # ECR base: 123456789.dkr.ecr.us-east-1.amazonaws.com
+  imageTag: latest
+  imagePullPolicy: Always
+
+  db:
+    host: ""            # RDS endpoint
+    port: 3306
+    user: admin
+    password: ""        # inject via --set or external secret
+
+  jwtSecret: ""         # inject via --set or external secret
+
+# ── Per-service configuration ─────────────────────────────────────────────────
+# Each key becomes the Deployment/Service name in Kubernetes.
+# Templates loop over this map — add a new service here and everything
+# (Deployment, Service, HPA, health probes) is created automatically.
+services:
+
+  user-service:
+    image: user-service
+    port: 3001
+    replicas: 2
+    env:
+      PORT: "3001"
+      DB_NAME: users_db
+      NODE_ENV: production
+    healthPath: /health
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+    hpa:
+      enabled: true
+      min: 2
+      max: 8
+      cpuPercent: 60
+
+  order-service:
+    image: order-service
+    port: 3002
+    replicas: 2
+    env:
+      PORT: "3002"
+      DB_NAME: orders_db
+      NODE_ENV: production
+      USER_SERVICE_URL: http://user-service:3001
+    healthPath: /health
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+    hpa:
+      enabled: true
+      min: 2
+      max: 8
+      cpuPercent: 60
+
+  product-service:
+    image: product-service
+    port: 80
+    replicas: 2
+    env:
+      DB_NAME: products_db
+      APP_ENV: production
+      APP_DEBUG: "false"
+    healthPath: /up
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 300m, memory: 512Mi }
+    hpa:
+      enabled: true
+      min: 2
+      max: 6
+      cpuPercent: 60
+
+  payment-service:
+    image: payment-service
+    port: 80
+    replicas: 2
+    env:
+      DB_NAME: payments_db
+      APP_ENV: production
+      APP_DEBUG: "false"
+      ORDER_SERVICE_URL: http://order-service:3002
+    healthPath: /up
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits:   { cpu: 300m, memory: 512Mi }
+    hpa:
+      enabled: true
+      min: 2
+      max: 6
+      cpuPercent: 60
+
+  gateway:
+    image: gateway
+    port: 80
+    replicas: 2
+    env: {}
+    healthPath: /health
+    resources:
+      requests: { cpu: 50m,  memory: 64Mi }
+      limits:   { cpu: 200m, memory: 128Mi }
+    hpa:
+      enabled: true
+      min: 2
+      max: 10
+      cpuPercent: 50
+
+  frontend:
+    image: frontend
+    port: 80
+    replicas: 2
+    env: {}
+    healthPath: /
+    resources:
+      requests: { cpu: 50m,  memory: 32Mi }
+      limits:   { cpu: 100m, memory: 64Mi }
+    hpa:
+      enabled: false
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+  host: ""             # e.g. api.yourdomain.com (blank = use ALB DNS)

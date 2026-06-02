@@ -1,0 +1,53 @@
+# Production overrides — applied on top of values.yaml
+# Usage: helm upgrade --install microservices ./helm -f values.prod.yaml \
+#          --set global.registry=<ECR> \
+#          --set global.jwtSecret=<secret> \
+#          --set global.db.host=<rds-endpoint> \
+#          --set global.db.password=<password>
+
+global:
+  imageTag: "1.0.0"      # pin to a specific release tag, never use latest in prod
+  imagePullPolicy: IfNotPresent
+
+services:
+  user-service:
+    replicas: 3
+    hpa: { enabled: true, min: 3, max: 12, cpuPercent: 60 }
+    resources:
+      requests: { cpu: 200m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+  order-service:
+    replicas: 3
+    hpa: { enabled: true, min: 3, max: 12, cpuPercent: 60 }
+    resources:
+      requests: { cpu: 200m, memory: 256Mi }
+      limits:   { cpu: 500m, memory: 512Mi }
+
+  product-service:
+    replicas: 3
+    hpa: { enabled: true, min: 3, max: 8, cpuPercent: 60 }
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits:   { cpu: 500m, memory: 1Gi }
+
+  payment-service:
+    replicas: 3
+    hpa: { enabled: true, min: 3, max: 8, cpuPercent: 60 }
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits:   { cpu: 500m, memory: 1Gi }
+
+  gateway:
+    replicas: 3
+    hpa: { enabled: true, min: 3, max: 15, cpuPercent: 50 }
+
+ingress:
+  host: "api.yourdomain.com"
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:ACCOUNT:certificate/CERT-ID"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Bash(sed -i '' -e s/node-user-service:3001/user-service:3001/g -e s/node-order-service:3002/order-service:3002/g -e s/php-product-service:80/product-service:80/g -e s/php-payment-service:80/payment-service:80/g /Users/mhrprabin/aws/microservice/gateway/nginx.conf)",
+      "Bash(sed -i '' -e s/node-user-service:3001/user-service:3001/g /Users/mhrprabin/aws/microservice/gateway/lua/auth.lua)",
+      "Bash(sed -i '' 's|require\\('\\\\''../db'\\\\''\\)|require\\('\\\\''../config/database'\\\\''\\)|g' /Users/mhrprabin/aws/microservice/services/user-service/src/controllers/userController.js /Users/mhrprabin/aws/microservice/services/user-service/src/routes/userRoutes.js /Users/mhrprabin/aws/microservice/services/user-service/src/index.js /Users/mhrprabin/aws/microservice/services/order-service/src/controllers/orderController.js /Users/mhrprabin/aws/microservice/services/order-service/src/routes/orderRoutes.js /Users/mhrprabin/aws/microservice/services/order-service/src/index.js)",
+      "Bash(sed -i '' 's|require\\('\\\\''./db'\\\\''\\)|require\\('\\\\''./config/database'\\\\''\\)|g' /Users/mhrprabin/aws/microservice/services/user-service/src/index.js /Users/mhrprabin/aws/microservice/services/order-service/src/index.js)",
+      "Bash(helm template *)",
+      "Bash(docker run *)",
+      "Bash(curl -s http://localhost:8001/api/products)",
+      "Bash(curl -s http://localhost/api/users/health)",
+      "Bash(curl -s http://localhost/api/orders/health)",
+      "Bash(curl -s http://localhost/api/products/health)",
+      "Bash(curl -s http://localhost/api/payments/health)"
+    ]
+  }
+}
