@@ -15,8 +15,8 @@ class PaymentRequest extends FormRequest
     {
         return [
             'order_id' => 'required|integer',
-            'user_id'  => 'required|integer',
-            'amount'   => 'required|numeric|min:0.01',
+            // user_id is NOT required — taken from X-User-Id gateway header
+            'amount'   => 'nullable|numeric|min:0.01',  // optional: falls back to order total
             'currency' => 'nullable|string|size:3',
             'method'   => 'nullable|in:card,bank_transfer,wallet,cash',
             'notes'    => 'nullable|string',

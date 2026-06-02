@@ -12,6 +12,7 @@
         <RouterLink to="/orders">🛒 Orders</RouterLink>
         <RouterLink to="/payments">💳 Payments</RouterLink>
         <RouterLink to="/users">👥 Users</RouterLink>
+        <RouterLink to="/notifications">🔔 Notifications</RouterLink>
       </nav>
       <div class="sidebar-footer">
         <div style="font-size:.8rem; color:var(--muted); margin-bottom:8px">

@@ -1,11 +1,74 @@
 version: '3.9'
 
-# EC2 production compose — uses RDS instead of local MySQL
-# Set these env vars before running:
-#   RDS_HOST, RDS_USER, RDS_PASSWORD, JWT_SECRET, ECR_BASE
+# EC2 production compose — uses RDS for MySQL, runs Kafka & RabbitMQ on EC2
+# Required env vars in .env.ec2:
+#   ECR_BASE, RDS_HOST, RDS_USER, RDS_PASSWORD, JWT_SECRET,
+#   RABBITMQ_USER, RABBITMQ_PASS, ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME,
+#   PRODUCT_APP_KEY, PAYMENT_APP_KEY
 
 services:
 
+  # ── Kafka (KRaft mode) ─────────────────────────────────────────────────────
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      CLUSTER_ID: "ZGVmYXVsdC1jbHVzdGVyLWlk"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
+    restart: unless-stopped
+    networks: [microservices]
+
+  # ── Kafka topic initialiser ────────────────────────────────────────────────
+  kafka-init:
+    image: apache/kafka:latest
+    container_name: kafka-init
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        /opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka:9092
+        --topic order-events --partitions 3 --replication-factor 1 --if-not-exists &&
+        /opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka:9092
+        --topic payment-events --partitions 3 --replication-factor 1 --if-not-exists &&
+        echo "Kafka topics ready"
+    networks: [microservices]
+
+  # ── RabbitMQ ───────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks: [microservices]
+
+  # ── Node.js User Service ───────────────────────────────────────────────────
   user-service:
     image: ${ECR_BASE}/user-service:latest
     container_name: user-service
@@ -18,9 +81,18 @@ services:
       DB_PASSWORD: ${RDS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@1234}
+      ADMIN_NAME: ${ADMIN_NAME:-Super Admin}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
     networks: [microservices]
 
+  # ── Node.js Order Service ──────────────────────────────────────────────────
   order-service:
     image: ${ECR_BASE}/order-service:latest
     container_name: order-service
@@ -34,44 +106,115 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       USER_SERVICE_URL: http://user-service:3001
       NODE_ENV: production
+      KAFKA_BROKER: kafka:9092
+      KAFKAJS_NO_PARTITIONER_WARNING: "1"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks: [microservices]
 
+  # ── Laravel Product Service ───────────────────────────────────────────────
   product-service:
     image: ${ECR_BASE}/product-service:latest
     container_name: product-service
     environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${PRODUCT_APP_KEY}
       DB_HOST: ${RDS_HOST}
       DB_PORT: 3306
       DB_NAME: products_db
       DB_USER: ${RDS_USER}
       DB_PASSWORD: ${RDS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/up"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
     networks: [microservices]
 
+  # ── Laravel Payment Service ───────────────────────────────────────────────
   payment-service:
     image: ${ECR_BASE}/payment-service:latest
     container_name: payment-service
     environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${PAYMENT_APP_KEY}
       DB_HOST: ${RDS_HOST}
       DB_PORT: 3306
       DB_NAME: payments_db
       DB_USER: ${RDS_USER}
       DB_PASSWORD: ${RDS_PASSWORD}
       ORDER_SERVICE_URL: http://order-service:3002
+      KAFKA_BROKER: kafka:9092
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/up"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      kafka: { condition: service_healthy }
     restart: unless-stopped
     networks: [microservices]
 
+  # ── NestJS Notification Service ───────────────────────────────────────────
+  notification-service:
+    image: ${ECR_BASE}/notification-service:latest
+    container_name: notification-service
+    environment:
+      PORT: 3003
+      DB_HOST: ${RDS_HOST}
+      DB_PORT: 3306
+      DB_NAME: notifications_db
+      DB_USER: ${RDS_USER}
+      DB_PASSWORD: ${RDS_PASSWORD}
+      NODE_ENV: production
+      KAFKA_BROKER: kafka:9092
+      KAFKAJS_NO_PARTITIONER_WARNING: "1"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks: [microservices]
+
+  # ── NGINX/OpenResty API Gateway ────────────────────────────────────────────
   gateway:
     image: ${ECR_BASE}/gateway:latest
     container_name: gateway
     ports:
       - "80:80"
     depends_on:
-      - user-service
-      - order-service
-      - product-service
-      - payment-service
+      user-service:         { condition: service_healthy }
+      order-service:        { condition: service_healthy }
+      product-service:      { condition: service_healthy }
+      payment-service:      { condition: service_healthy }
+      notification-service: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [microservices]
+
+  # ── Vue.js Frontend ────────────────────────────────────────────────────────
+  frontend:
+    image: ${ECR_BASE}/frontend:latest
+    container_name: frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - gateway
     restart: unless-stopped
     networks: [microservices]
 

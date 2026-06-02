@@ -20,6 +20,8 @@ DB_PORT=${DB_PORT:-3306}
 DB_DATABASE=${DB_NAME:-payments_db}
 DB_USERNAME=${DB_USER:-root}
 DB_PASSWORD=${DB_PASSWORD:-}
+
+KAFKA_BROKERS=${KAFKA_BROKER:-kafka:9092}
 EOF
 
 cd /var/www/html

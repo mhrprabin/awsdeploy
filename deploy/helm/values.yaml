@@ -94,6 +94,24 @@ services:
       max: 6
       cpuPercent: 60
 
+  notification-service:
+    image: notification-service
+    port: 3003
+    replicas: 2
+    env:
+      PORT: "3003"
+      DB_NAME: notifications_db
+      NODE_ENV: production
+    healthPath: /health
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits:   { cpu: 250m, memory: 256Mi }
+    hpa:
+      enabled: true
+      min: 2
+      max: 6
+      cpuPercent: 60
+
   gateway:
     image: gateway
     port: 80

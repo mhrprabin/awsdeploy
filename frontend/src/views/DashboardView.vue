@@ -82,10 +82,11 @@ const stats = ref({ users: 0, products: 0, orders: 0, payments: 0 })
 const recentOrders = ref([])
 
 const services = ref([
-  { name: 'User Service',    icon: '👤', status: 'loading', url: '/api/users/health'    },
-  { name: 'Order Service',   icon: '🛒', status: 'loading', url: '/api/orders/health'   },
-  { name: 'Product Service', icon: '📦', status: 'loading', url: '/api/products/health' },
-  { name: 'Payment Service', icon: '💳', status: 'loading', url: '/api/payments/health' },
+  { name: 'User Service',         icon: '👤', status: 'loading', url: '/api/users/health'         },
+  { name: 'Order Service',        icon: '🛒', status: 'loading', url: '/api/orders/health'        },
+  { name: 'Product Service',      icon: '📦', status: 'loading', url: '/api/products/health'      },
+  { name: 'Payment Service',      icon: '💳', status: 'loading', url: '/api/payments/health'      },
+  { name: 'Notification Service', icon: '🔔', status: 'loading', url: '/api/notifications/health' },
 ])
 
 async function checkHealth(svc) {

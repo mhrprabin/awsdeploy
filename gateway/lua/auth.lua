@@ -12,7 +12,8 @@ local PUBLIC_PATHS = {
     ["/api/users/health"]        = true,
     ["/api/orders/health"]       = true,
     ["/api/products/health"]     = true,
-    ["/api/payments/health"]     = true,
+    ["/api/payments/health"]      = true,
+    ["/api/notifications/health"] = true,
 }
 
 -- ── Permission rules ──────────────────────────────────────────────────────────

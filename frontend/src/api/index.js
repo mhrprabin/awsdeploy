@@ -54,3 +54,13 @@ export const paymentApi = {
   refund:    id      => api.post(`/payments/${id}/refund`),
   byOrder:   ordId   => api.get(`/payments/order/${ordId}`),
 }
+
+export const notificationApi = {
+  list:        ()       => api.get('/notifications'),
+  byUser:      userId   => api.get(`/notifications/user/${userId}`),
+  unreadCount: userId   => api.get(`/notifications/user/${userId}/unread-count`),
+  create:      data     => api.post('/notifications', data),
+  markRead:    id       => api.patch(`/notifications/${id}/read`),
+  markAllRead: userId   => api.patch(`/notifications/user/${userId}/read-all`),
+  remove:      id       => api.delete(`/notifications/${id}`),
+}

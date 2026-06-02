@@ -5,6 +5,63 @@ version: '3.9'
 
 services:
 
+  # ── Kafka (KRaft mode — official Apache image, no Zookeeper) ─────────────
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      CLUSTER_ID: "ZGVmYXVsdC1jbHVzdGVyLWlk"   # required for KRaft
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
+    networks: [microservices]
+
+  # ── Kafka topic initialiser (runs once, creates topics, then exits) ────────
+  kafka-init:
+    image: apache/kafka:latest
+    container_name: kafka-init
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        /opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka:9092
+        --topic order-events --partitions 3 --replication-factor 1 --if-not-exists &&
+        /opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka:9092
+        --topic payment-events --partitions 3 --replication-factor 1 --if-not-exists &&
+        echo "Kafka topics ready"
+    networks: [microservices]
+
+  # ── Kafka UI (visual dashboard at http://localhost:8090) ───────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka: { condition: service_healthy }
+    networks: [microservices]
+
   # ── MySQL (simulates RDS locally) ──────────────────────────────────────────
   mysql:
     image: mysql:8.0
@@ -18,6 +75,22 @@ services:
       - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [microservices]
+
+  # ── RabbitMQ Message Broker ───────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "15672:15672"     # management UI: http://localhost:15672
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -55,6 +128,8 @@ services:
       DB_NAME: orders_db
       USER_SERVICE_URL: http://user-service:3001
       NODE_ENV: production
+      KAFKA_BROKER: kafka:9092
+      KAFKAJS_NO_PARTITIONER_WARNING: "1"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
       interval: 15s
@@ -63,6 +138,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     networks: [microservices]
 
   # ── Laravel Product Service ───────────────────────────────────────────────
@@ -97,6 +174,7 @@ services:
       APP_KEY: ${PAYMENT_APP_KEY:-}
       DB_NAME: payments_db
       ORDER_SERVICE_URL: http://order-service:3002
+      KAFKA_BROKER: kafka:9092
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/up"]
       interval: 20s
@@ -106,6 +184,31 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [microservices]
+
+  # ── NestJS Notification Service ───────────────────────────────────────────
+  notification-service:
+    build: ./services/notification-service
+    container_name: notification-service
+    env_file: .env
+    environment:
+      PORT: 3003
+      DB_NAME: notifications_db
+      NODE_ENV: production
+      KAFKA_BROKER: kafka:9092
+      KAFKAJS_NO_PARTITIONER_WARNING: "1"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully   # wait until topics are created
     networks: [microservices]
 
   # ── NGINX/OpenResty API Gateway ────────────────────────────────────────────
@@ -116,10 +219,11 @@ services:
     ports:
       - "80:80"           # Only the gateway is publicly exposed
     depends_on:
-      user-service:    { condition: service_healthy }
-      order-service:   { condition: service_healthy }
-      product-service: { condition: service_healthy }
-      payment-service: { condition: service_healthy }
+      user-service:         { condition: service_healthy }
+      order-service:        { condition: service_healthy }
+      product-service:      { condition: service_healthy }
+      payment-service:      { condition: service_healthy }
+      notification-service: { condition: service_healthy }
     networks: [microservices]
 
   # ── Vue.js Frontend ────────────────────────────────────────────────────────

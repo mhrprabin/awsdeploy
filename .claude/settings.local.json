@@ -12,7 +12,13 @@
       "Bash(curl -s http://localhost/api/users/health)",
       "Bash(curl -s http://localhost/api/orders/health)",
       "Bash(curl -s http://localhost/api/products/health)",
-      "Bash(curl -s http://localhost/api/payments/health)"
+      "Bash(curl -s http://localhost/api/payments/health)",
+      "Bash(curl -s http://localhost/api/notifications/health)",
+      "Bash(curl -s -X POST http://localhost/api/users/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@example.com\",\"password\":\"Admin@1234\"}')",
+      "Bash(curl -s -X POST http://localhost/api/notifications -H 'Content-Type: application/json' -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c 'import sys,json; d=json.load\\(sys.stdin\\); print\\(f\"Total: {d[\\\\\"total\\\\\"]}, First: {d[\\\\\"notifications\\\\\"][0][\\\\\"title\\\\\"]}\"\\)')",
+      "Bash(docker rm *)"
     ]
   }
 }

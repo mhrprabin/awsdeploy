@@ -33,7 +33,9 @@
           <tbody>
             <tr v-for="p in filtered" :key="p.id">
               <td>#{{ p.id }}</td>
-              <td>Order #{{ p.order_id }}</td>
+              <td>
+                <span style="font-weight:500">Order #{{ p.order_id }}</span>
+              </td>
               <td style="font-weight:600">{{ p.currency }} ${{ Number(p.amount).toFixed(2) }}</td>
               <td style="text-transform:capitalize">{{ p.method }}</td>
               <td><span :class="`badge badge-${p.status}`">{{ p.status }}</span></td>
@@ -61,22 +63,54 @@
     <!-- New Payment Modal -->
     <div v-if="modal" class="modal-overlay" @click.self="modal = false">
       <div class="modal">
-        <h3>Create Payment</h3>
+        <h3>Pay for an Order</h3>
         <div v-if="modalError" class="alert alert-error">{{ modalError }}</div>
-        <div class="grid-2">
-          <div class="form-group">
-            <label>Order ID *</label>
-            <input v-model.number="form.order_id" type="number" placeholder="1" />
-          </div>
-          <div class="form-group">
-            <label>User ID *</label>
-            <input v-model.number="form.user_id" type="number" placeholder="1" />
+
+        <!-- Order selection — only unpaid orders shown -->
+        <div class="form-group">
+          <label>Select Order *</label>
+          <select v-model="form.order_id" @change="onOrderSelected">
+            <option value="">-- choose a pending order --</option>
+            <option v-for="o in pendingOrders" :key="o.id" :value="o.id">
+              Order #{{ o.id }} — total ${{ Number(o.total_price).toFixed(2) }}
+              · paid ${{ Number(o.paid_amount || 0).toFixed(2) }}
+              · remaining ${{ remainingFor(o).toFixed(2) }}
+            </option>
+          </select>
+          <div v-if="pendingOrders.length === 0"
+               style="font-size:.8rem;color:var(--muted);margin-top:4px">
+            No pending orders. Place an order first.
           </div>
         </div>
+
+        <!-- Remaining balance indicator -->
+        <div v-if="selectedOrder" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted);margin-bottom:4px">
+            <span>Payment progress</span>
+            <span>${{ Number(selectedOrder.paid_amount || 0).toFixed(2) }} of ${{ Number(selectedOrder.total_price).toFixed(2) }}</span>
+          </div>
+          <div style="height:6px;background:var(--border);border-radius:99px;overflow:hidden">
+            <div :style="{
+              width: Math.min(100, (Number(selectedOrder.paid_amount||0)/Number(selectedOrder.total_price))*100) + '%',
+              height: '100%',
+              background: 'var(--primary)',
+              transition: 'width .3s'
+            }"></div>
+          </div>
+        </div>
+
+        <!-- Amount: defaults to remaining balance, user can enter less for partial -->
         <div class="grid-2">
           <div class="form-group">
-            <label>Amount *</label>
-            <input v-model="form.amount" type="number" step="0.01" placeholder="99.99" />
+            <label>
+              Amount
+              <span v-if="selectedOrder" style="color:var(--muted);font-size:.8rem">
+                (max ${{ remainingFor(selectedOrder).toFixed(2) }})
+              </span>
+            </label>
+            <input v-model="form.amount" type="number" step="0.01" min="0.01"
+                   :max="selectedOrder ? remainingFor(selectedOrder) : undefined"
+                   :placeholder="selectedOrder ? remainingFor(selectedOrder).toFixed(2) : 'Amount'" />
           </div>
           <div class="form-group">
             <label>Currency</label>
@@ -85,6 +119,7 @@
             </select>
           </div>
         </div>
+
         <div class="form-group">
           <label>Payment Method</label>
           <select v-model="form.method">
@@ -94,13 +129,20 @@
             <option value="cash">Cash</option>
           </select>
         </div>
+
         <div class="form-group">
           <label>Notes</label>
           <input v-model="form.notes" placeholder="Optional notes..." />
         </div>
+
+        <!-- What happens after payment -->
+        <div v-if="form.order_id" style="background:#f0f4ff;border-radius:6px;padding:12px;font-size:.8rem;color:var(--muted);margin-bottom:4px">
+          🔔 On <strong>Complete</strong>: order #{{ form.order_id }} will automatically move to <strong>confirmed</strong> via Kafka.
+        </div>
+
         <div class="modal-actions">
           <button class="btn btn-outline" @click="modal = false">Cancel</button>
-          <button class="btn btn-primary" @click="save" :disabled="saving">
+          <button class="btn btn-primary" @click="save" :disabled="saving || !form.order_id">
             {{ saving ? 'Processing...' : 'Create Payment' }}
           </button>
         </div>
@@ -112,16 +154,33 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { usePaymentStore } from '../stores/payments'
+import { useOrderStore }   from '../stores/orders'
+import { useAuthStore }    from '../stores/auth'
 
-const store        = usePaymentStore()
+const store      = usePaymentStore()
+const orderStore = useOrderStore()
+const auth       = useAuthStore()
+
 const modal        = ref(false)
 const saving       = ref(false)
 const modalError   = ref('')
 const filterStatus = ref('')
 
 const statuses = ['pending','processing','completed','failed','refunded']
-const emptyForm = () => ({ order_id: '', user_id: '', amount: '', currency: 'USD', method: 'card', notes: '' })
+
+const emptyForm = () => ({
+  order_id: '',
+  amount:   '',
+  currency: 'USD',
+  method:   'card',
+  notes:    '',
+})
 const form = ref(emptyForm())
+
+// Only show orders that haven't been paid yet (pending / not confirmed)
+const pendingOrders = computed(() =>
+  orderStore.items.filter(o => ['pending'].includes(o.status))
+)
 
 const filtered = computed(() =>
   !filterStatus.value ? store.items : store.items.filter(p => p.status === filterStatus.value)
@@ -131,6 +190,11 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function onOrderSelected() {
+  const order = orderStore.items.find(o => o.id === form.value.order_id)
+  if (order) form.value.amount = order.total_price
+}
+
 function openModal() {
   modalError.value = ''
   form.value = emptyForm()
@@ -138,12 +202,19 @@ function openModal() {
 }
 
 async function save() {
-  if (!form.value.order_id || !form.value.user_id || !form.value.amount) {
-    modalError.value = 'Order ID, User ID, and amount are required'; return
+  if (!form.value.order_id) {
+    modalError.value = 'Please select an order'; return
   }
   saving.value = true; modalError.value = ''
   try {
-    await store.create(form.value)
+    // user_id is no longer sent — the payment-service reads it from X-User-Id gateway header
+    await store.create({
+      order_id: form.value.order_id,
+      amount:   form.value.amount || undefined,
+      currency: form.value.currency,
+      method:   form.value.method,
+      notes:    form.value.notes || undefined,
+    })
     modal.value = false
   } catch (e) {
     modalError.value = e.response?.data?.error || 'Failed to create payment'
@@ -154,16 +225,22 @@ async function save() {
 
 async function updateStatus(id, status) {
   await store.setStatus(id, status)
+  // Reload orders — status may have changed via Kafka
+  setTimeout(() => orderStore.fetchAll(), 1500)
 }
 
 async function refund(id) {
   if (!confirm('Refund this payment?')) return
   try {
     await store.refund(id)
+    setTimeout(() => orderStore.fetchAll(), 1500)
   } catch (e) {
     alert(e.response?.data?.error || 'Refund failed')
   }
 }
 
-onMounted(() => store.fetchAll())
+onMounted(() => {
+  store.fetchAll()
+  orderStore.fetchAll()   // need orders to populate dropdown
+})
 </script>
