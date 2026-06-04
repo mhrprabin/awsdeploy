@@ -11,6 +11,8 @@ COPY composer.json ./
 
 RUN composer install --no-dev --optimize-autoloader --no-interaction --quiet
 
+COPY artisan    artisan
+COPY public/    public/
 COPY bootstrap/ bootstrap/
 COPY routes/    routes/
 COPY app/       app/

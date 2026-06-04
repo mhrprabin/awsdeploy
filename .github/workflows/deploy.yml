@@ -198,6 +198,17 @@ jobs:
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
+
+            # Install mysql client if missing
+            if ! command -v mysql &>/dev/null; then
+              sudo apt-get install -y mysql-client 2>/dev/null || \
+              sudo yum install -y mysql 2>/dev/null || true
+            fi
+
+            # Run DB init — creates all databases and tables (idempotent)
+            mysql -h "$RDS_HOST" -u "$RDS_USER" -p"$RDS_PASSWORD" \
+              < ~/microservice/deploy/db/init.sql
+
             docker compose -f deploy/ec2/docker-compose.app.yml pull
             docker compose -f deploy/ec2/docker-compose.app.yml up -d --remove-orphans
             docker image prune -f
@@ -253,6 +264,7 @@ jobs:
 
             # Install AWS CLI v2 if missing
             if ! command -v aws &>/dev/null; then
+              sudo apt-get install -y unzip curl 2>/dev/null || sudo yum install -y unzip curl 2>/dev/null || true
               curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
               unzip -q /tmp/awscliv2.zip -d /tmp
               sudo /tmp/aws/install

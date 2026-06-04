@@ -26,6 +26,9 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Claude Code
+.claude/settings.local.json
+
 # AWS
 .aws/
 *.pem

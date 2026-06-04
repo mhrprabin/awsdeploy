@@ -27,7 +27,10 @@
       "Bash(awk -F'use ' '{print $2}')",
       "Bash(composer --version)",
       "Bash(docker --version)",
-      "Bash(composer update *)"
+      "Bash(composer update *)",
+      "Bash(git -C /Users/mhrprabin/aws/microservice status)",
+      "Bash(git -C /Users/mhrprabin/aws/microservice diff --stat HEAD)",
+      "Bash(chmod +x /Users/mhrprabin/aws/microservice/services/product-service/artisan /Users/mhrprabin/aws/microservice/services/payment-service/artisan)"
     ]
   }
 }
