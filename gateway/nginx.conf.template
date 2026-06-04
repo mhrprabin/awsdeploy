@@ -1,0 +1,122 @@
+# Expose JWT_SECRET env var to Lua (OpenResty blocks env by default)
+env JWT_SECRET;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream user_service         { server ${APP_HOST}:3001; }
+    upstream order_service        { server ${APP_HOST}:3002; }
+    upstream product_service      { server ${APP_HOST}:8001; }
+    upstream payment_service      { server ${APP_HOST}:8002; }
+    upstream notification_service { server ${APP_HOST}:3003; }
+
+    # Where to find custom Lua modules
+    lua_package_path "/usr/local/openresty/nginx/lua/?.lua;;";
+
+    limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
+
+    init_by_lua_block {
+        -- Compile auth module once at startup, shared across all workers
+        require("auth")
+    }
+
+    server {
+        listen 80;
+
+        # Single line — all auth + permission logic lives in lua/auth.lua
+        access_by_lua_block { require("auth")() }
+
+        # ── Gateway health ─────────────────────────────────────────────────
+        location = /health {
+            default_type application/json;
+            return 200 '{"gateway":"openresty","status":"ok"}';
+        }
+
+        # ── Public health endpoints ────────────────────────────────────────
+        # Exact-match locations rewrite the path to each service's native
+        # health route so no JWT token is required from the dashboard.
+        location = /api/users/health {
+            proxy_pass http://user_service/health;
+        }
+        location = /api/orders/health {
+            proxy_pass http://order_service/health;
+        }
+        location = /api/products/health {
+            proxy_pass http://product_service/up;   # Laravel health = /up
+        }
+        location = /api/payments/health {
+            proxy_pass http://payment_service/up;
+        }
+        location = /api/notifications/health {
+            proxy_pass http://notification_service/health;
+        }
+
+        # ── Public ─────────────────────────────────────────────────────────
+        location = /api/users/login {
+            limit_req zone=api burst=5 nodelay;
+            proxy_pass       http://user_service;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Real-IP       $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        location = /api/users/register {
+            limit_req zone=api burst=5 nodelay;
+            proxy_pass       http://user_service;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Real-IP       $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        # ── Protected routes ───────────────────────────────────────────────
+        location /api/users {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass       http://user_service;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Real-IP       $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Authorization   $http_authorization;
+        }
+
+        location /api/orders {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass       http://order_service;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Real-IP       $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Authorization   $http_authorization;
+        }
+
+        location /api/products {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass       http://product_service;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Real-IP       $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        location /api/payments {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass       http://payment_service;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Real-IP       $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        location /api/notifications {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass       http://notification_service;
+            proxy_set_header Host            $host;
+            proxy_set_header X-Real-IP       $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Authorization   $http_authorization;
+        }
+
+        location / {
+            default_type application/json;
+            return 404 '{"error":"Route not found"}';
+        }
+    }
+}

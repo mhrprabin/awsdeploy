@@ -1,0 +1,32 @@
+version: '3.9'
+
+# Instance 3 — Web / Gateway
+# Runs: gateway (port 80), frontend (port 8080)
+# Required env vars: ECR_BASE, APP_HOST (private IP of Instance 2), JWT_SECRET
+
+services:
+
+  gateway:
+    image: ${ECR_BASE}/gateway:latest
+    container_name: gateway
+    ports:
+      - "80:80"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      APP_HOST: ${APP_HOST}
+    restart: unless-stopped
+    networks: [microservices]
+
+  frontend:
+    image: ${ECR_BASE}/frontend:latest
+    container_name: frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    networks: [microservices]
+
+networks:
+  microservices:
+    driver: bridge

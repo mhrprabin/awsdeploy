@@ -1,9 +1,9 @@
 version: '3.9'
 
-# EC2 production compose — uses RDS for MySQL, runs Kafka & RabbitMQ on EC2
+# EC2 production compose — t3.medium (2 vCPU, 4 GB RAM)
 # Required env vars in .env.ec2:
 #   ECR_BASE, RDS_HOST, RDS_USER, RDS_PASSWORD, JWT_SECRET,
-#   RABBITMQ_USER, RABBITMQ_PASS, ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME,
+#   ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME,
 #   PRODUCT_APP_KEY, PAYMENT_APP_KEY
 
 services:
@@ -51,21 +51,6 @@ services:
         /opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka:9092
         --topic payment-events --partitions 3 --replication-factor 1 --if-not-exists &&
         echo "Kafka topics ready"
-    networks: [microservices]
-
-  # ── RabbitMQ ───────────────────────────────────────────────────────────────
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
     networks: [microservices]
 
   # ── Node.js User Service ───────────────────────────────────────────────────

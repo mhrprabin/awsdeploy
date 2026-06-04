@@ -1,0 +1,58 @@
+version: '3.9'
+
+# Instance 1 — Infrastructure
+# Runs: Kafka
+# Exposes port 9092 to the app instance (via security group)
+# Required env vars: KAFKA_HOST (this instance's private IP)
+
+services:
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      # Must advertise the real private IP so remote consumers can connect
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_HOST}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      CLUSTER_ID: "ZGVmYXVsdC1jbHVzdGVyLWlk"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
+    restart: unless-stopped
+    networks: [microservices]
+
+  kafka-init:
+    image: apache/kafka:latest
+    container_name: kafka-init
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        /opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka:9092
+        --topic order-events --partitions 3 --replication-factor 1 --if-not-exists &&
+        /opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka:9092
+        --topic payment-events --partitions 3 --replication-factor 1 --if-not-exists &&
+        echo "Kafka topics ready"
+    networks: [microservices]
+
+networks:
+  microservices:
+    driver: bridge
