@@ -1,6 +1,4 @@
 # ── Stage 1: Build (PHP 8.3 + Composer) ──────────────────────────────────────
-# Use the same PHP version as the runtime so platform_check.php targets 8.3,
-# not the build machine's PHP version (which could be 8.4 in composer:latest).
 FROM php:8.3-cli-alpine AS deps
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -9,15 +7,14 @@ RUN apk add --no-cache git unzip
 
 WORKDIR /app
 
-RUN composer create-project laravel/laravel:^11.0 . \
-      --prefer-dist --no-dev --quiet
+COPY composer.json ./
 
-RUN rm -f database/migrations/*.php
+RUN composer install --no-dev --optimize-autoloader --no-interaction --quiet
 
-COPY bootstrap/app.php      bootstrap/app.php
-COPY routes/api.php         routes/api.php
-COPY app/                   app/
-COPY database/migrations/   database/migrations/
+COPY bootstrap/ bootstrap/
+COPY routes/    routes/
+COPY app/       app/
+COPY database/  database/
 
 RUN composer dump-autoload --optimize
 

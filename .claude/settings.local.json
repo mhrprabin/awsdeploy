@@ -23,7 +23,8 @@
       "Bash(grep -v \"\\\\${{\")",
       "Bash(git -C /Users/mhrprabin/aws/microservice ls-files)",
       "Bash(grep -E \"\\\\.env$|\\\\.env\\\\.\")",
-      "Bash(grep -rn --include=\"*.yml\" --include=\"*.yaml\" --include=\"*.sh\" -E \"\\(echo|print|log|cat|debug|printf|console\\\\.log\\).*\\\\$\\\\{\\\\{\" /Users/mhrprabin/aws/microservice --exclude-dir=.git)"
+      "Bash(grep -rn --include=\"*.yml\" --include=\"*.yaml\" --include=\"*.sh\" -E \"\\(echo|print|log|cat|debug|printf|console\\\\.log\\).*\\\\$\\\\{\\\\{\" /Users/mhrprabin/aws/microservice --exclude-dir=.git)",
+      "Bash(awk -F'use ' '{print $2}')"
     ]
   }
 }
