@@ -243,6 +243,22 @@ jobs:
             AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             bash -s <<'ENDSSH'
             set -e
+
+            # Install Docker if missing
+            if ! command -v docker &>/dev/null; then
+              curl -fsSL https://get.docker.com | sh
+              sudo usermod -aG docker $USER
+              newgrp docker
+            fi
+
+            # Install AWS CLI v2 if missing
+            if ! command -v aws &>/dev/null; then
+              curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+              unzip -q /tmp/awscliv2.zip -d /tmp
+              sudo /tmp/aws/install
+              rm -rf /tmp/awscliv2.zip /tmp/aws
+            fi
+
             if [ ! -d ~/microservice/.git ]; then
               rm -rf ~/microservice
               git clone https://github.com/${{ github.repository }}.git ~/microservice
