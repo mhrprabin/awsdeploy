@@ -111,9 +111,15 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.EC2_HOST_INFRA }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 10 -H "${{ secrets.EC2_HOST_INFRA }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat >> ~/.ssh/config <<'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            ConnectTimeout 15
+          EOF
 
       - name: Write .env on Instance 1
         run: |
@@ -152,9 +158,15 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.EC2_HOST_APP }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 10 -H "${{ secrets.EC2_HOST_APP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat >> ~/.ssh/config <<'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            ConnectTimeout 15
+          EOF
 
       - name: Write .env on Instance 2
         run: |
@@ -206,9 +218,15 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.EC2_HOST_WEB }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 10 -H "${{ secrets.EC2_HOST_WEB }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat >> ~/.ssh/config <<'EOF'
+          Host *
+            StrictHostKeyChecking accept-new
+            ConnectTimeout 15
+          EOF
 
       - name: Write .env on Instance 3
         run: |

@@ -28,7 +28,10 @@ WORKDIR /var/www/html
 
 COPY --from=deps /app .
 
-RUN chown -R www-data:www-data storage bootstrap/cache && \
+RUN mkdir -p storage/app/public storage/framework/cache/data \
+             storage/framework/sessions storage/framework/testing \
+             storage/framework/views storage/logs bootstrap/cache && \
+    chown -R www-data:www-data storage bootstrap/cache && \
     chmod -R 775 storage bootstrap/cache
 
 COPY nginx/default.conf   /etc/nginx/http.d/default.conf
