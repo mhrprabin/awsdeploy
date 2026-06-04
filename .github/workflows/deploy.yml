@@ -123,20 +123,27 @@ jobs:
 
       - name: Write .env on Instance 1
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_INFRA }} bash -s <<'ENDSSH'
-            cat > ~/microservice/.env.ec2 <<EOF
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_INFRA }} \
+            'mkdir -p ~/microservice && cat > ~/microservice/.env.ec2' <<EOF
           ECR_BASE=${{ env.ECR_BASE }}
           AWS_REGION=${{ vars.AWS_REGION }}
           KAFKA_HOST=${{ secrets.KAFKA_HOST }}
           EOF
-          ENDSSH
 
       - name: Deploy Kafka
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_INFRA }} bash -s <<'ENDSSH'
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_INFRA }} \
+            AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            bash -s <<'ENDSSH'
             set -e
+            if [ ! -d ~/microservice/.git ]; then
+              rm -rf ~/microservice
+              git clone https://github.com/${{ github.repository }}.git ~/microservice
+            fi
             cd ~/microservice
-            git pull origin $(git rev-parse --abbrev-ref HEAD)
+            git fetch origin
+            git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
@@ -172,8 +179,8 @@ jobs:
 
       - name: Write .env on Instance 2
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_APP }} bash -s <<'ENDSSH'
-            cat > ~/microservice/.env.ec2 <<EOF
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_APP }} \
+            'mkdir -p ~/microservice && cat > ~/microservice/.env.ec2' <<EOF
           ECR_BASE=${{ env.ECR_BASE }}
           AWS_REGION=${{ vars.AWS_REGION }}
           KAFKA_HOST=${{ secrets.KAFKA_HOST }}
@@ -187,14 +194,21 @@ jobs:
           PRODUCT_APP_KEY=${{ secrets.PRODUCT_APP_KEY }}
           PAYMENT_APP_KEY=${{ secrets.PAYMENT_APP_KEY }}
           EOF
-          ENDSSH
 
       - name: Deploy App Services
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_APP }} bash -s <<'ENDSSH'
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_APP }} \
+            AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            bash -s <<'ENDSSH'
             set -e
+            if [ ! -d ~/microservice/.git ]; then
+              rm -rf ~/microservice
+              git clone https://github.com/${{ github.repository }}.git ~/microservice
+            fi
             cd ~/microservice
-            git pull origin $(git rev-parse --abbrev-ref HEAD)
+            git fetch origin
+            git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
@@ -234,21 +248,28 @@ jobs:
 
       - name: Write .env on Instance 3
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} bash -s <<'ENDSSH'
-            cat > ~/microservice/.env.ec2 <<EOF
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} \
+            'mkdir -p ~/microservice && cat > ~/microservice/.env.ec2' <<EOF
           ECR_BASE=${{ env.ECR_BASE }}
           AWS_REGION=${{ vars.AWS_REGION }}
           APP_HOST=${{ secrets.APP_HOST }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           EOF
-          ENDSSH
 
       - name: Deploy Gateway + Frontend
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} bash -s <<'ENDSSH'
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} \
+            AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+            AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+            bash -s <<'ENDSSH'
             set -e
+            if [ ! -d ~/microservice/.git ]; then
+              rm -rf ~/microservice
+              git clone https://github.com/${{ github.repository }}.git ~/microservice
+            fi
             cd ~/microservice
-            git pull origin $(git rev-parse --abbrev-ref HEAD)
+            git fetch origin
+            git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
