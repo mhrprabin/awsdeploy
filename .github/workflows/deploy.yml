@@ -121,18 +121,13 @@ jobs:
             ConnectTimeout 15
           EOF
 
-      - name: Write .env on Instance 1
-        run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_INFRA }} \
-            'mkdir -p ~/microservice && cat > ~/microservice/.env.ec2' <<EOF
-          ECR_BASE=${{ env.ECR_BASE }}
-          AWS_REGION=${{ vars.AWS_REGION }}
-          KAFKA_HOST=${{ secrets.KAFKA_HOST }}
-          EOF
-
       - name: Deploy Kafka
         run: |
+          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nKAFKA_HOST=%s\n' \
+            '${{ env.ECR_BASE }}' '${{ vars.AWS_REGION }}' '${{ secrets.KAFKA_HOST }}' \
+            | base64 -w0)
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_INFRA }} \
+            ENV_B64="$ENV_B64" \
             AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
             AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             bash -s <<'ENDSSH'
@@ -144,6 +139,7 @@ jobs:
             cd ~/microservice
             git fetch origin
             git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+            echo "$ENV_B64" | base64 -d > .env.ec2
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
@@ -177,27 +173,16 @@ jobs:
             ConnectTimeout 15
           EOF
 
-      - name: Write .env on Instance 2
-        run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_APP }} \
-            'mkdir -p ~/microservice && cat > ~/microservice/.env.ec2' <<EOF
-          ECR_BASE=${{ env.ECR_BASE }}
-          AWS_REGION=${{ vars.AWS_REGION }}
-          KAFKA_HOST=${{ secrets.KAFKA_HOST }}
-          RDS_HOST=${{ secrets.RDS_HOST }}
-          RDS_USER=${{ secrets.RDS_USER }}
-          RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-          ADMIN_NAME=${{ secrets.ADMIN_NAME }}
-          PRODUCT_APP_KEY=${{ secrets.PRODUCT_APP_KEY }}
-          PAYMENT_APP_KEY=${{ secrets.PAYMENT_APP_KEY }}
-          EOF
-
       - name: Deploy App Services
         run: |
+          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nKAFKA_HOST=%s\nRDS_HOST=%s\nRDS_USER=%s\nRDS_PASSWORD=%s\nJWT_SECRET=%s\nADMIN_EMAIL=%s\nADMIN_PASSWORD=%s\nADMIN_NAME=%s\nPRODUCT_APP_KEY=%s\nPAYMENT_APP_KEY=%s\n' \
+            '${{ env.ECR_BASE }}' '${{ vars.AWS_REGION }}' '${{ secrets.KAFKA_HOST }}' \
+            '${{ secrets.RDS_HOST }}' '${{ secrets.RDS_USER }}' '${{ secrets.RDS_PASSWORD }}' \
+            '${{ secrets.JWT_SECRET }}' '${{ secrets.ADMIN_EMAIL }}' '${{ secrets.ADMIN_PASSWORD }}' \
+            '${{ secrets.ADMIN_NAME }}' '${{ secrets.PRODUCT_APP_KEY }}' '${{ secrets.PAYMENT_APP_KEY }}' \
+            | base64 -w0)
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_APP }} \
+            ENV_B64="$ENV_B64" \
             AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
             AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             bash -s <<'ENDSSH'
@@ -209,6 +194,7 @@ jobs:
             cd ~/microservice
             git fetch origin
             git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+            echo "$ENV_B64" | base64 -d > .env.ec2
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
@@ -246,19 +232,13 @@ jobs:
             ConnectTimeout 15
           EOF
 
-      - name: Write .env on Instance 3
-        run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} \
-            'mkdir -p ~/microservice && cat > ~/microservice/.env.ec2' <<EOF
-          ECR_BASE=${{ env.ECR_BASE }}
-          AWS_REGION=${{ vars.AWS_REGION }}
-          APP_HOST=${{ secrets.APP_HOST }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          EOF
-
       - name: Deploy Gateway + Frontend
         run: |
+          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nAPP_HOST=%s\nJWT_SECRET=%s\n' \
+            '${{ env.ECR_BASE }}' '${{ vars.AWS_REGION }}' '${{ secrets.APP_HOST }}' '${{ secrets.JWT_SECRET }}' \
+            | base64 -w0)
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} \
+            ENV_B64="$ENV_B64" \
             AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
             AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             bash -s <<'ENDSSH'
@@ -270,6 +250,7 @@ jobs:
             cd ~/microservice
             git fetch origin
             git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+            echo "$ENV_B64" | base64 -d > .env.ec2
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
