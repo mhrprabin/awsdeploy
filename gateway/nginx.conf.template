@@ -22,8 +22,23 @@ http {
         require("auth")
     }
 
+    # Redirect all HTTP to HTTPS
     server {
         listen 80;
+        server_name ${DOMAIN};
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl;
+        server_name ${DOMAIN};
+
+        ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_ciphers         HIGH:!aNULL:!MD5;
+        ssl_session_cache   shared:SSL:10m;
+        ssl_session_timeout 10m;
 
         # Single line — all auth + permission logic lives in lua/auth.lua
         access_by_lua_block { require("auth")() }
@@ -35,8 +50,6 @@ http {
         }
 
         # ── Public health endpoints ────────────────────────────────────────
-        # Exact-match locations rewrite the path to each service's native
-        # health route so no JWT token is required from the dashboard.
         location = /api/users/health {
             proxy_pass http://user_service/health;
         }
@@ -44,7 +57,7 @@ http {
             proxy_pass http://order_service/health;
         }
         location = /api/products/health {
-            proxy_pass http://product_service/up;   # Laravel health = /up
+            proxy_pass http://product_service/up;
         }
         location = /api/payments/health {
             proxy_pass http://payment_service/up;

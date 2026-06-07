@@ -1,8 +1,6 @@
-version: '3.9'
-
 # Instance 3 — Web / Gateway
-# Runs: gateway (port 80), frontend (port 8080)
-# Required env vars: ECR_BASE, APP_HOST (private IP of Instance 2), JWT_SECRET
+# Runs: gateway (port 80→443), frontend (port 8080)
+# Required env vars: ECR_BASE, APP_HOST, JWT_SECRET, DOMAIN, IMAGE_TAG
 
 services:
 
@@ -11,9 +9,13 @@ services:
     container_name: gateway
     ports:
       - "80:80"
+      - "443:443"
     environment:
       JWT_SECRET: ${JWT_SECRET}
       APP_HOST: ${APP_HOST}
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     restart: unless-stopped
     networks: [microservices]
 

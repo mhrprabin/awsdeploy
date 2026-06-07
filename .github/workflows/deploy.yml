@@ -247,9 +247,9 @@ jobs:
 
       - name: Deploy Gateway + Frontend
         run: |
-          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nAPP_HOST=%s\nJWT_SECRET=%s\nIMAGE_TAG=%s\n' \
+          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nAPP_HOST=%s\nJWT_SECRET=%s\nIMAGE_TAG=%s\nDOMAIN=%s\nADMIN_EMAIL=%s\n' \
             '${{ env.ECR_BASE }}' '${{ vars.AWS_REGION }}' '${{ secrets.APP_HOST }}' '${{ secrets.JWT_SECRET }}' \
-            '${{ github.sha }}' \
+            '${{ github.sha }}' '${{ vars.DOMAIN }}' '${{ secrets.ADMIN_EMAIL }}' \
             | base64 -w0)
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} \
             ENV_B64="$ENV_B64" \
@@ -285,6 +285,26 @@ jobs:
             set -o allexport && source .env.ec2 && set +o allexport
             aws ecr get-login-password --region "$AWS_REGION" | \
               docker login --username AWS --password-stdin "$ECR_BASE"
+
+            # Install certbot if missing
+            if ! command -v certbot &>/dev/null; then
+              sudo apt-get update -qq && sudo apt-get install -y certbot
+            fi
+
+            # Get SSL cert if not already issued for this domain
+            if [ ! -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem ]; then
+              # Stop gateway if running so certbot can bind port 80
+              docker compose -f deploy/ec2/docker-compose.web.yml stop gateway 2>/dev/null || true
+              sudo certbot certonly --standalone \
+                --non-interactive --agree-tos \
+                --email "$ADMIN_EMAIL" \
+                -d "$DOMAIN"
+            fi
+
+            # Set up auto-renewal: reload openresty inside container after renewal
+            echo "0 3 * * * root certbot renew --quiet --deploy-hook 'docker exec gateway openresty -s reload'" | \
+              sudo tee /etc/cron.d/certbot-renewal > /dev/null
+
             docker compose -f deploy/ec2/docker-compose.web.yml pull
             docker compose -f deploy/ec2/docker-compose.web.yml up -d --remove-orphans
             docker image prune -f
