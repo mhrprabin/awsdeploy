@@ -10,7 +10,7 @@ version: '3.9'
 services:
 
   user-service:
-    image: ${ECR_BASE}/user-service:latest
+    image: ${ECR_BASE}/user-service:${IMAGE_TAG}
     container_name: user-service
     ports:
       - "3001:3001"
@@ -35,7 +35,7 @@ services:
     networks: [microservices]
 
   order-service:
-    image: ${ECR_BASE}/order-service:latest
+    image: ${ECR_BASE}/order-service:${IMAGE_TAG}
     container_name: order-service
     ports:
       - "3002:3002"
@@ -60,7 +60,7 @@ services:
     networks: [microservices]
 
   product-service:
-    image: ${ECR_BASE}/product-service:latest
+    image: ${ECR_BASE}/product-service:${IMAGE_TAG}
     container_name: product-service
     ports:
       - "8001:80"
@@ -83,7 +83,7 @@ services:
     networks: [microservices]
 
   payment-service:
-    image: ${ECR_BASE}/payment-service:latest
+    image: ${ECR_BASE}/payment-service:${IMAGE_TAG}
     container_name: payment-service
     ports:
       - "8002:80"
@@ -108,7 +108,7 @@ services:
     networks: [microservices]
 
   notification-service:
-    image: ${ECR_BASE}/notification-service:latest
+    image: ${ECR_BASE}/notification-service:${IMAGE_TAG}
     container_name: notification-service
     ports:
       - "3003:3003"

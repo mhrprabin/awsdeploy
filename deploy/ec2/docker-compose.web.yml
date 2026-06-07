@@ -7,7 +7,7 @@ version: '3.9'
 services:
 
   gateway:
-    image: ${ECR_BASE}/gateway:latest
+    image: ${ECR_BASE}/gateway:${IMAGE_TAG}
     container_name: gateway
     ports:
       - "80:80"
@@ -18,7 +18,7 @@ services:
     networks: [microservices]
 
   frontend:
-    image: ${ECR_BASE}/frontend:latest
+    image: ${ECR_BASE}/frontend:${IMAGE_TAG}
     container_name: frontend
     ports:
       - "8080:80"

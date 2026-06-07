@@ -123,8 +123,9 @@ jobs:
 
       - name: Deploy Kafka
         run: |
-          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nKAFKA_HOST=%s\n' \
+          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nKAFKA_HOST=%s\nIMAGE_TAG=%s\n' \
             '${{ env.ECR_BASE }}' '${{ vars.AWS_REGION }}' '${{ secrets.KAFKA_HOST }}' \
+            '${{ github.sha }}' \
             | base64 -w0)
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_INFRA }} \
             ENV_B64="$ENV_B64" \
@@ -175,11 +176,12 @@ jobs:
 
       - name: Deploy App Services
         run: |
-          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nKAFKA_HOST=%s\nRDS_HOST=%s\nRDS_USER=%s\nRDS_PASSWORD=%s\nJWT_SECRET=%s\nADMIN_EMAIL=%s\nADMIN_PASSWORD=%s\nADMIN_NAME=%s\nPRODUCT_APP_KEY=%s\nPAYMENT_APP_KEY=%s\n' \
+          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nKAFKA_HOST=%s\nRDS_HOST=%s\nRDS_USER=%s\nRDS_PASSWORD=%s\nJWT_SECRET=%s\nADMIN_EMAIL=%s\nADMIN_PASSWORD=%s\nADMIN_NAME=%s\nPRODUCT_APP_KEY=%s\nPAYMENT_APP_KEY=%s\nIMAGE_TAG=%s\n' \
             '${{ env.ECR_BASE }}' '${{ vars.AWS_REGION }}' '${{ secrets.KAFKA_HOST }}' \
             '${{ secrets.RDS_HOST }}' '${{ secrets.RDS_USER }}' '${{ secrets.RDS_PASSWORD }}' \
             '${{ secrets.JWT_SECRET }}' '${{ secrets.ADMIN_EMAIL }}' '${{ secrets.ADMIN_PASSWORD }}' \
             '${{ secrets.ADMIN_NAME }}' '${{ secrets.PRODUCT_APP_KEY }}' '${{ secrets.PAYMENT_APP_KEY }}' \
+            '${{ github.sha }}' \
             | base64 -w0)
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_APP }} \
             ENV_B64="$ENV_B64" \
@@ -245,8 +247,9 @@ jobs:
 
       - name: Deploy Gateway + Frontend
         run: |
-          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nAPP_HOST=%s\nJWT_SECRET=%s\n' \
+          ENV_B64=$(printf 'ECR_BASE=%s\nAWS_REGION=%s\nAPP_HOST=%s\nJWT_SECRET=%s\nIMAGE_TAG=%s\n' \
             '${{ env.ECR_BASE }}' '${{ vars.AWS_REGION }}' '${{ secrets.APP_HOST }}' '${{ secrets.JWT_SECRET }}' \
+            '${{ github.sha }}' \
             | base64 -w0)
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST_WEB }} \
             ENV_B64="$ENV_B64" \
