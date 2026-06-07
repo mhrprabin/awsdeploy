@@ -65,8 +65,8 @@ end
 local function run()
     local path = ngx.var.uri
 
-    -- Skip auth for public routes
-    if PUBLIC_PATHS[path] then
+    -- Skip auth for public routes and all frontend (non-API) routes
+    if PUBLIC_PATHS[path] or not path:find("^/api/") then
         return
     end
 
